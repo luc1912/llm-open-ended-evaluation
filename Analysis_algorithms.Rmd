@@ -1,0 +1,84 @@
+---
+title: "Analiza_algoritama"
+author: "0036538843 Lucija Runjić"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("readxl")
+library("tidyverse")
+library("dplyr")
+library("stringr")
+library("ggplot2")
+library("tidyr")
+library("knitr")
+library("gridExtra")
+library("purrr")
+```
+
+```{r}
+grades <- read_csv("comparison.csv")
+grades <- grades %>% select(-id_student, -calculated_grade)
+grades <- na.omit(grades)
+```
+
+```{r}
+grades <- grades %>%
+  select("real_grade", "calculated_grade_rounded")
+grades_long <- reshape2::melt(grades, variable.name = "Grade_Type", value.name = "Grade")
+
+
+grades_long <- grades_long %>%
+  mutate(Grade_Type = str_replace_all(Grade_Type, "real_grade", "Stvarni bodovi"),
+         Grade_Type = str_replace_all(Grade_Type, "calculated_grade_rounded", "Izračunati bodovi"),
+         Grade = str_replace_all(Grade, "0", "1"),
+         Grade = str_replace_all(Grade, "11", "1")
+  )
+
+
+ggplot(grades_long, aes(x = Grade, fill = Grade_Type)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Title", x = "Ocjena", y = "Frekvencija", fill = "Tip ocjene") +
+  scale_fill_ordinal() +
+  theme_bw()
+```
+```{r}
+sum_calculated <- sum(grades$calculated_grade_rounded, na.rm = TRUE)
+sum_real <- sum(grades$real_grade, na.rm = TRUE)
+
+
+sum_calculated
+sum_real
+```
+```{r}
+grading_grades <- read_csv("student_grading_grades_compared.csv")
+grading_grades <- grading_grades %>% select(-id_student, -koef)
+names(grading_grades) <- c("Stvarni bodovi", "Izračunati bodovi")
+```
+
+```{r}
+grading_grades <- grading_grades %>%
+  select("Izračunati bodovi", "Stvarni bodovi")
+grading_grades_long <- reshape2::melt(grading_grades, variable.name = "Grade_Type", value.name = "Grade")
+
+grading_grades_long <- grading_grades_long %>%
+  mutate(Grade = str_replace_all(Grade, "20", "5"),
+        Grade = str_replace_all(Grade, "21", "4"),
+        Grade = str_replace_all(Grade, "0", "1")
+  )
+
+ggplot(grading_grades_long, aes(x = Grade, fill = Grade_Type)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Title", x = "Ocjena", y = "Frekvencija", fill = "Tip ocjene") +
+  scale_fill_ordinal() +
+  theme_bw()
+```
+
+
+
+

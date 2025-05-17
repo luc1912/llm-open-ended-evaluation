@@ -1,0 +1,502 @@
+---
+title: "Analiza podataka - profesori"
+author: "0036538843 Lucija Runjić"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("readxl")
+library("tidyverse")
+library("dplyr")
+library("stringr")
+library("ggplot2")
+library("tidyr")
+library("knitr")
+library("gridExtra")
+library("purrr")
+```
+
+
+```{r, message=FALSE, echo=FALSE}
+grades <- read_csv("ocjene_profesori_LLM.csv")
+teacher_llm_grades <- read_csv("ocjene_profesori_LLM.csv")
+peer_review_grades <- read_csv("peer_review_grades.csv")
+grading_pts <- read_csv("grading_pts.csv")
+```
+```{r, echo=FALSE}
+peer_review_grades <- peer_review_grades %>%
+  select(
+    -`Unnamed: 0`,
+    -calib_job_ordinal, 
+    -ends_with("_crct"), 
+    -ends_with("_calib"))
+
+peer_review_grades <- peer_review_grades %>%
+  mutate(jobs_list = str_extract_all(jobs, "\\d+")) %>%  
+  mutate(jobs_list = map(jobs_list, ~ as.numeric(.))) %>%
+  mutate(jobs_list = map(jobs_list, ~ .[. > 0])) %>%  
+  unnest(jobs_list) %>%
+  mutate(job_index = (row_number() - 1) %% 4 + 1) %>%  
+  rename(id_job = jobs_list)
+
+peer_review_grades <- peer_review_grades %>%
+  rowwise() %>%
+  mutate(
+    q1 = get(paste0("q1_", job_index)),
+    q2 = get(paste0("q2_", job_index)),
+    q3 = get(paste0("q3_", job_index)),
+    q4 = get(paste0("q4_", job_index)),
+    q5 = get(paste0("q5_", job_index)),
+    q6 = get(paste0("q6_", job_index)),
+    q7 = get(paste0("q7_", job_index)),
+    q8 = get(paste0("q8_", job_index)),
+    q9 = get(paste0("q9_", job_index)),
+    q10 = get(paste0("q10_", job_index)),
+    q11 = get(paste0("q11_", job_index)),
+    q12 = get(paste0("q12_", job_index)),
+    q13 = get(paste0("q13_", job_index)),
+    q14 = get(paste0("q14_", job_index)),
+    q15 = get(paste0("q15_", job_index)),
+    q16 = get(paste0("q16_", job_index)),
+    q17 = get(paste0("q17_", job_index)),
+    q18 = get(paste0("q18_", job_index)),
+    q19 = get(paste0("q19_", job_index)),
+    q20 = get(paste0("q20_", job_index))
+  ) %>%
+  select(id_student, id_job, q1:q20)
+
+peer_review_grades <- peer_review_grades %>%
+  rename(id_student_grader = id_student)
+
+peer_review_grades <- peer_review_grades %>%
+  semi_join(teacher_llm_grades, by = "id_job")
+
+peer_review_grades_grouped <- peer_review_grades %>%
+  group_by(id_job) %>%
+  summarise(
+    q1_avg = mean(q1, na.rm = TRUE),
+    q2_avg = mean(q2, na.rm = TRUE),
+    q3_avg = mean(q3, na.rm = TRUE),
+    q4_avg = mean(q4, na.rm = TRUE),
+    q5_avg = mean(q5, na.rm = TRUE),
+    q6_avg = mean(q6, na.rm = TRUE),
+    q7_avg = mean(q7, na.rm = TRUE),
+    q8_avg = mean(q8, na.rm = TRUE),
+    q9_avg = mean(q9, na.rm = TRUE),
+    q10_avg = mean(q10, na.rm = TRUE),
+    q11_avg = mean(q11, na.rm = TRUE),
+    q12_avg = mean(q12, na.rm = TRUE),
+    q13_avg = mean(q13, na.rm = TRUE),
+    q14_avg = mean(q14, na.rm = TRUE),
+    q15_avg = mean(q15, na.rm = TRUE),
+    q16_avg = mean(q16, na.rm = TRUE),
+    q17_avg = mean(q17, na.rm = TRUE),
+    q18_avg = mean(q18, na.rm = TRUE),
+    q19_avg = mean(q19, na.rm = TRUE),
+    q20_avg = mean(q20, na.rm = TRUE)
+  )
+```
+
+```{r, echo = FALSE, warning=FALSE}
+avg_cgpt_brad <- teacher_llm_grades %>%
+  select(id_job, avg_cgpt, avg_bard)
+
+peer_review_grades_grouped <- peer_review_grades_grouped %>%
+  mutate(across(where(is.numeric), round, digits = 2))
+
+
+peer_review_grades_grouped$avg_peer_grade <- 
+  round(rowMeans(
+    peer_review_grades_grouped
+    [,grep("q[0-9]+_avg", names(peer_review_grades_grouped))]
+    ), 2)
+
+peer_review_grades_avg <- 
+  left_join(peer_review_grades_grouped, avg_cgpt_brad, by = "id_job") %>%
+  select(id_job, avg_peer_grade, avg_cgpt, avg_bard)
+
+peer_review_grades_avg <- peer_review_grades_avg %>%
+  rename(
+    "Peer review" = avg_peer_grade,
+    "ChatGPT" = avg_cgpt,
+    "Bard" = avg_bard
+  )
+
+peer_review_grades_avg_long <- 
+  pivot_longer(peer_review_grades_avg, cols = c("Peer review", "ChatGPT", "Bard"), 
+               names_to = "grader", 
+               values_to = "average")
+```
+
+
+```{r, echo=FALSE}
+grades$avg_teachers <- round(rowMeans(grades[, c("avg_t1", "avg_t2", "avg_t3")]), 2)
+
+grades$q1_avg_teachers <- round(rowMeans(grades[, c("q1_t1", "q1_t2", "q1_t3")]), 2)
+grades$q2_avg_teachers <- round(rowMeans(grades[, c("q2_t1", "q2_t2", "q2_t3")]), 2)
+grades$q3_avg_teachers <- round(rowMeans(grades[, c("q3_t1", "q3_t2", "q3_t3")]), 2)
+grades$q4_avg_teachers <- round(rowMeans(grades[, c("q4_t1", "q4_t2", "q4_t3")]), 2)
+grades$q5_avg_teachers <- round(rowMeans(grades[, c("q5_t1", "q5_t2", "q5_t3")]), 2)
+grades$q6_avg_teachers <- round(rowMeans(grades[, c("q6_t1", "q6_t2", "q6_t3")]), 2)
+grades$q7_avg_teachers <- round(rowMeans(grades[, c("q7_t1", "q7_t2", "q7_t3")]), 2)
+grades$q8_avg_teachers <- round(rowMeans(grades[, c("q8_t1", "q8_t2", "q8_t3")]), 2)
+grades$q9_avg_teachers <- round(rowMeans(grades[, c("q9_t1", "q9_t2", "q9_t3")]), 2)
+grades$q10_avg_teachers <- round(rowMeans(grades[, c("q10_t1", "q10_t2", "q10_t3")]), 2)
+grades$q11_avg_teachers <- round(rowMeans(grades[, c("q11_t1", "q11_t2", "q11_t3")]), 2)
+grades$q12_avg_teachers <- round(rowMeans(grades[, c("q12_t1", "q12_t2", "q12_t3")]), 2)
+grades$q13_avg_teachers <- round(rowMeans(grades[, c("q13_t1", "q13_t2", "q13_t3")]), 2)
+grades$q14_avg_teachers <- round(rowMeans(grades[, c("q14_t1", "q14_t2", "q14_t3")]), 2)
+grades$q15_avg_teachers <- round(rowMeans(grades[, c("q15_t1", "q15_t2", "q15_t3")]), 2)
+grades$q16_avg_teachers <- round(rowMeans(grades[, c("q16_t1", "q16_t2", "q16_t3")]), 2)
+grades$q17_avg_teachers <- round(rowMeans(grades[, c("q17_t1", "q17_t2", "q17_t3")]), 2)
+grades$q18_avg_teachers <- round(rowMeans(grades[, c("q18_t1", "q18_t2", "q18_t3")]), 2)
+grades$q19_avg_teachers <- round(rowMeans(grades[, c("q19_t1", "q19_t2", "q19_t3")]), 2)
+grades$q20_avg_teachers <- round(rowMeans(grades[, c("q20_t1", "q20_t2", "q20_t3")]), 2)
+
+grades_with_students <- grades
+grades_with_students$avg_students <- peer_review_grades_grouped$avg_peer_grade
+
+avg_df_students <- grades_with_students %>% select(avg_t1, avg_t2, avg_t3, avg_cgpt, avg_bard, avg_students) %>%
+  pivot_longer(names_to = "avg", cols = everything())
+
+avg_df_students <- avg_df_students %>%
+  rename(grader = avg, average = value)
+
+avg_df_students <- avg_df_students %>%
+  mutate(grader = str_replace_all(grader, "avg_t1", "Nastavnik 1"),
+         grader = str_replace_all(grader, "avg_t2", "Nastavnik 2"),
+         grader = str_replace_all(grader, "avg_t3", "Nastavnik 3"),
+         grader = str_replace_all(grader, "avg_cgpt", "ChatGPT"),
+         grader = str_replace_all(grader, "avg_bard", "Bard"),
+         grader = str_replace_all(grader, "avg_students", "Peer review")
+         )
+
+
+avg_df <- grades %>% select(avg_t1, avg_t2, avg_t3, avg_cgpt, avg_bard) %>%
+  pivot_longer(names_to = "avg", cols = everything())
+
+avg_df <- avg_df %>%
+  rename(grader = avg, average = value)
+
+avg_df <- avg_df %>%
+  mutate(grader = str_replace_all(grader, "avg_t1", "Nastavnik 1"),
+         grader = str_replace_all(grader, "avg_t2", "Nastavnik 2"),
+         grader = str_replace_all(grader, "avg_t3", "Nastavnik 3"),
+         grader = str_replace_all(grader, "avg_cgpt", "ChatGPT"),
+         grader = str_replace_all(grader, "avg_bard", "Bard")
+         )
+
+avg_df2 <- grades %>% select(avg_teachers, avg_cgpt, avg_bard) %>%
+  pivot_longer(names_to = "avg", cols = everything())
+
+avg_df2 <- avg_df2 %>%
+  rename(grader = avg, average = value)
+
+avg_df <- avg_df %>%
+  mutate(grader = str_replace_all(grader, "avg_teachers", "Profesori"),
+         grader = str_replace_all(grader, "avg_cgpt", "ChatGPT"),
+         grader = str_replace_all(grader, "avg_bard", "Bard")
+         )
+
+avg_df2$grader <- as.factor(avg_df2$grader)
+```
+
+# Vizualizacija podataka i usporedba prosječnih ocjena profesora
+# peer review ocjenjivajna i LLM-ova
+
+## Usporedba prosječnih ocjena 
+
+```{r, echo=FALSE}
+ggplot(avg_df_students, aes(x = grader, y = average, color = grader)) + geom_point() +
+  theme_bw() + 
+  scale_color_ordinal() + 
+  labs(x = "", y = "", color = "", 
+       title = "Usporedba prosječnih ocjena LLM-ova i profesora") +
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+Prikazani graf prikazuje prosječne ocjene dodijeljene studentskim radovima od strane pet različita ocjenjivača: Bard-a, ChatGPT-a, drugih studenata (Peer Review način ocjenjivanja), te tri profesora (Nastavnik 1, Nastavnik 2, Nastavnik 3). Svaka točka na grafu predstavlja prosječnu ocjenu za određeni studentski rad.
+Na grafu se može vidjeti da najširu raspodjelu ocjena pokazuju profesori. Peer review ocjenjivanje teži prema nižim ocjenama te je vrlo malo radova ocijenjeno sa prosječnom ocjenom višom od 4.5. Bard i ChatGPT pokazuju najmanju varijabilnost u ocjenjivanju, grupirajući se većinom oko viših ocjena.
+
+## Box-plot grafovi
+
+```{r, echo=FALSE}
+ggplot(avg_df_students, aes(x = grader, y = average)) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  labs(x = "", y = "", color = "", 
+       title = "Box-Plot grafovi prosječnih ocjena LLM-ova i profesora") +
+   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+Box-plotovi su korisni za vizualizaciju raspodjele ocjena jer prikazuju medijane, kvartile i stršeće vrijednosti. Na prikazanom grafu vidimo pet box-plotova koji predstavljaju ocjene od strane Bard-a, ChatGPT-a, peer review ocjene te ocjene tri različita profesora.
+Medijani ocjena od ChatGPT-a i Barda-a nalaze se između 4.5 i 5.0, što ukazuje na tendenciju davanja viših ocjena.
+Peer review medijan je najniži iz čega se može naslutiti da su studenti bili najstroži u ocjenjivanju.
+Box-plot Bard-ovih ocjena ima relativno uži interkvartilni raspon u odnosu na ostale ocjenjivače, što ukazuje na manje varijacije pri ocjenjivanju.
+LLM-ovi i studenti a imaju stršeće vrijednosti, odnosno outliere što može biti pokazatelj nekonzistentnosti u vrednovanju, što nije slučaj kod vrednovanja profesora.
+Ocjene profesora pokazuju najmanje varijacije i kompaktan raspon što ukazuje na ujednačeniji pristup ocjenjivanju
+
+## Numeričke vrijednosti
+
+```{r, echo=FALSE}
+averages <- aggregate(average ~ grader, data = avg_df_students, mean)
+colnames(averages) <- c("", "")
+kable(averages, caption = "", allign = "r")
+```
+
+```{r}
+medians <- aggregate(average ~ grader, data = avg_df_students, median)
+colnames(medians) <- c("", "")
+kable(medians)
+```
+
+
+Numerički podaci potvrđuju ono što smo vizualno primijetili na grafovima, Bard i ChatGPT su davali više ocjene, no ocjene ChatGPT-a manje odstupaju od peer review i profesorskih ocjena. Zanimljivo je i da ova statistika pokazuje kako su peer review ocjene generalno niže i od profesorskih ocjena, što znači da su studenti ocjenjivali radove svojih kolega strože nego što su to radili profesori.
+
+## Frekvencije ocjena
+
+### Usporedba frekvencija ocjena LLM-ova u odnosu na profesore
+
+```{r, echo=FALSE}
+ggplot(avg_df, aes(x = average, fill = grader)) +
+  geom_bar(color = "black", alpha = 0.6) +
+  labs(x = "", y = "", fill = "") +
+  scale_y_continuous(breaks = seq(0, 17, by = 2)) +
+  scale_x_continuous(breaks = seq(3, 5, by = 0.5)) +
+  scale_fill_ordinal() +
+  theme_bw() +
+  theme(legend.position = "none") + 
+  facet_wrap(~ grader, scales = 'free') 
+```
+Ova vizualizacija prikazuje frekvenciju dodijeljenih prosječnih ocjena za studentske radove od strane različitih ocjenjivača. 
+Na x osi nalaze se prosječne ocjene, a na y osi se nalazi frekvencija koliko se puta ta prosječna ocjena pojavila.
+Vidi se da Bard najčešće radovima dodjeljuje skoro maksimalan broj bodova (17 puta zabilježena prosječna ocjena 5.0), dok profesori i ChatGPT pokazuju širi raspon ocjena.
+
+### Usporedba frekvencija ocjena LLM-ova u odnosu na peer review ocjenjivanje
+
+
+```{r, echo=FALSE}
+cgpt <- teacher_llm_grades %>% 
+  select(matches("^q\\d+_cgpt$")) %>%
+  unlist(use.names = FALSE)
+cgpt <- as.data.frame(cgpt)
+colnames(cgpt) <- "count"
+
+bard <- teacher_llm_grades %>%
+  select(matches("^q\\d+_bard$")) %>%
+  unlist(use.names = FALSE)
+bard <- as.data.frame(bard)
+colnames(bard) <- "count"
+
+peer_review <- peer_review_grades %>%
+  select(matches("^q\\d+$")) %>%
+  unlist(use.names = FALSE) %>%
+  na.omit()
+peer_review <- as.data.frame(peer_review)
+colnames(peer_review) <- "count"
+
+
+g1 <- cgpt %>%
+  ggplot(aes(x = "", y = count, fill = factor(count))) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  scale_fill_ordinal(name = "Ocjena", option = "G") +
+  theme_void() +
+  labs(title = "ChatGPT")
+
+g2 <- bard %>%
+  ggplot(aes(x = "", y = count, fill = factor(count))) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  scale_fill_ordinal(name = "Ocjena", option = "G") +
+  theme_void() +
+  labs(title = "Bard")
+
+g3 <- peer_review %>%
+  ggplot(aes(x = "", y = count, fill = factor(count))) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  scale_fill_ordinal(name = "Ocjena", option = "G") +
+  theme_void() +
+  labs(title = "Peer Review")
+
+grid.arrange(g2, g1, g3, ncol = 3)
+```
+Iz prikazanih grafova možemo vidjeti frekvencije vrednovanja zadataka sa pojedinim ocjenama za svakog ocjenjivača. Vidimo kako sva 3 ocjenjivača pretežito ocjenjuju radove sa ocjenom 5, no studenti su bili stroži i vjerojatno objektivniji i realniji u ocjenjivanju radova svojih kolega. ChatGPT ima puno sličniju raspodjelu ocjena studentima nego Bard, koji je preko 90% radova ocijenio sa 4 ili 5
+
+
+
+
+
+
+## Usporedba za pojedinačnog studenta po pitanjima
+
+```{r, echo=FALSE}
+student <- 5607
+
+student_data <- grades %>%
+  filter(id_student == student)
+
+filtered_cgpt <- student_data %>%
+  select(matches("q\\d+_cgpt$")) 
+
+filtered_bard <- student_data %>%
+  select(matches("q\\d+_bard$"))
+
+filtered_teachers <- student_data %>%
+  select(matches("q\\d+_avg_teachers$"))
+
+student_data_cgpt <- data.frame(filtered_cgpt, filtered_teachers)
+
+student_data_bard <- data.frame(filtered_bard, filtered_teachers)
+
+student_data_cgpt <-
+  pivot_longer(student_data_cgpt, cols = starts_with("q") | starts_with("avg"), names_to = "question", values_to = "score")
+
+student_data_bard <- 
+  pivot_longer(student_data_bard, cols = starts_with("q") | starts_with("avg"), names_to = "question", values_to = "score")
+
+student_data_cgpt$category <- ifelse(grepl("_cgpt$", student_data_cgpt$question), "CGPT", "Teachers")
+
+student_data_bard$category <- ifelse(grepl("_bard$", student_data_bard$question), "Bard", "Teachers")
+
+student_data_cgpt$question <- gsub("_cgpt$|_avg_teachers$", "", student_data_cgpt$question)
+student_data_cgpt$question <- factor(student_data_cgpt$question, levels = paste0("q", 1:20))
+student_data_cgpt$category <- as.factor(student_data_cgpt$category)
+
+student_data_bard$question <- gsub("_bard$|_avg_teachers$", "", student_data_bard$question)
+student_data_bard$question <- factor(student_data_bard$question, levels = paste0("q", 1:20))
+student_data_bard$category <- as.factor(student_data_bard$category)
+
+graph_cgpt <- ggplot(student_data_cgpt, aes(x = question, y = score, color = category)) +
+  geom_line(aes(group = category)) + 
+  geom_point() + 
+  labs(x = "Pitanje",
+       y = "Ocjena",
+       color = ""
+       ) +
+  theme_bw() + 
+  scale_color_discrete() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+graph_bard <- ggplot(student_data_bard, aes(x = question, y = score, color = category)) +
+  geom_line(aes(group = category)) + 
+  geom_point() + 
+  labs(x = "Pitanje",
+       y = "Ocjena",
+       color = ""
+       ) +
+  theme_bw() + 
+  scale_color_discrete() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+grid.arrange(graph_cgpt, graph_bard, ncol = 1)
+```
+Na ovoj vizualizaciji se vidi usporedba ocjena LLM-ova i profesora po pitanjima.
+Kod ocjena profesora uzet je prosjek ocjena 3 profesora za određeno pitanje za određenog studenta.
+Ovaj prikaz se odnosi na rad nasumičnog studenta.
+
+Nakon analize ovakvih grafova za ostale studente, ono što se može zaključiti je da ChatGPT i Bard za pojedina pitanja imaju velika odstupanja u odnosu na profesore. Npr. kada profesori vrednuju neko pitanje s ocjenom 2 ili 3, LLM-ovi ga vrednuju s 4 ili 5 što bi značilo da je po njima taj dio zadatka odrađen besprijekorno ili uz manje greške, što nije slučaj.
+
+Najveća odstupanja su se pokazala na pitanju 19, koje se odnosi na provjeru ograničenja u sql skripti. Neki studenti nisu uopće implementirali to ograničenje u svojem rješenju, a od LLM-ova bi dobili ocjenu odličan za taj dio.
+Osim toga, veća odstupanja vide se kod pitanja 5 i 6, koja se odnose na provjeru je li određeni entitet u ER dijagramu označen kao slabi entitet.
+Pitanja 12 i 13 su također dosta loše ocijenjena od strane LLM-ova, a ta pitanja se odnose na provjeru je li određena veza u ER dijagramu označena kao identificirajuća.
+
+
+
+```{r, echo=FALSE}
+avg_teachers <- grades$avg_teachers
+avg_cgpt <- grades$avg_cgpt
+avg_bard <- grades$avg_bard
+```
+
+
+
+# Vrednovanje ocjenjivanja LLM-ova
+
+U daljnjoj analizi, polazimo od pretpostavke da su profesori ispravno evaluirali radove.
+Umjesto da razmatramo ocjene koje je student dobio za pojedino pitanje od tri različita profesora pojedinačno, uzet ćemo prosjek njihovih ocjena.
+
+```{r, echo=FALSE}
+teacher_avg_per_task <- grades %>%
+  select(id_student, matches("^q\\d+_t\\d+$"), avg_teachers) %>%
+  pivot_longer(
+      cols = c(-id_student, -avg_teachers),
+      names_to = c("question", "teacher"),
+      names_sep = "_",
+      values_to = "grade"
+  ) %>%
+  group_by(id_student, question, avg_teachers) %>%
+  summarise(avg_grade = mean(grade, na.rm = TRUE), .groups = 'drop') %>%
+  mutate(avg_grade = round(avg_grade, 2), avg_teachers = round(avg_teachers, 2)) %>%
+  pivot_wider(
+    names_from = question,
+    values_from = avg_grade
+  ) %>%
+  select(id_student, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16, q17, q18, q19, q20, avg_teachers)
+
+cgpt <- grades %>% 
+  select(id_student, matches("^q\\d+_cgpt$"))
+
+bard <- grades %>%
+  select(id_student, matches("^q\\d+_bard$"))
+
+teacher_avg_per_task <- teacher_avg_per_task[order(teacher_avg_per_task$id_student), ]
+cgpt <- cgpt[order(cgpt$id_student), ]
+bard <- bard[order(bard$id_student), ]
+
+true_mean <- mean(teacher_avg_per_task$avg_teachers)
+SST = (teacher_avg_per_task[ , 2:21] - true_mean)^2 %>% sum  # ukupna varijabilnost obvervacija od njihove aritmetičke sredine
+SSE_cgpt <- sum((teacher_avg_per_task[ , 2:21] - cgpt[ , 2:21])^2) # pogreška predviđene vrijednosti od točne vrijednosti
+SSE_bard <- sum((teacher_avg_per_task[ , 2:21] - bard[ , 2:21])^2) # pogreška predviđene vrijednosti od točne vrijednosti
+```
+
+## Mjere odstupanja
+
+Kako bi izračunali mjeru odstupanja tj. pogreške LLM-ova u odnosu na profesore, koristimo se poznatom statističkom funkcijom koja se zove srednja kvadratna greška (Mean Sqared Error), također poznata i kao funkcija gubitka (loss function). 
+
+MSE se računa kao kvocijent između sume kvadriranih grešaka (SSE) i sume kvadrata totala (SST). 
+
+SEE je suma kvadratnih odstupanja između stvarnih i predviđenih vrijednosti. U našem slučaju, to je suma kvadratnih odstupanja između ocjena za svaki zadatak koje su dodijelili profesori i ocjena koje su dodijelili LLM-ovi.
+$$ SSE = \sum_{i=1}^{n} (y_i - \hat{y}_i)^2 $$
+SST mjeri ukupnu varijaciju u podatcima oko njihove srednje vrijednosti. U našem slučaju, to je suma kvadratnih odstupanja između ocjena koje su dodijelili profesori (za svako pitanje) i prosjeka svih ocjena koje su dodijelili profesori.
+$$ SST = \sum_{i=1}^{n} (y_i - \bar{y})^2 $$
+```{r, echo=FALSE}
+cat("Suma kvadriranih odstupanja ocjena ChatGPT-a od ocjena profesora:", SSE_cgpt, "\n")
+cat("Suma kvadriranih odstupanja ocjena Barda od ocjena profesora:", SSE_bard, "\n")
+cat("Suma kvadriranih odstupanja ocjena profesora i njihovog prosjeka:", SST, "\n")
+```
+
+Možemo vidjeti kako je SSE ChatGPT-a manji od SEE-a Bard-a što znači da su ocjene ChatGPT-a manje odstupale od ocjena profesora, odnosno bio je precizniji u vrednovanju zadatka.
+
+```{r, echo=FALSE}
+cat("Omjer SSE_cgpt/SST:", SSE_cgpt/SST, "\n")
+cat("Omjer SSE_bard/SST:", SSE_bard/SST, "\n")
+```
+
+Omjer SSE_cgpt/SST ukazuje da ChatGPT-ove greške predstavljaju oko 64.77% ukupne varijabilnosti ocjena. To znači da ChatGPT objašnjava oko 35.23% varijabilnosti ocjena. Iako nije savršeno, ovaj model ima određeni stupanj točnosti jer je omjer manji od 1.
+
+Omjer SSE_bard/SST pokazuje da su Bardove greške veće od ukupne varijabilnosti ocjena profesora (SST). Ovaj omjer veći od 1 ukazuje na to da model Bard ne samo da ne objašnjava varijabilnost ocjena, već dodaje dodatnu varijabilnost u podatke. Drugim riječima, predviđanja Barda su toliko netočna da su pogoršala mjerenje varijabilnosti umjesto da ga objasne.
+
+## R kvadrat
+
+R kvadrat je statistička mjera koja pokazuje kolika je varijacija prihvatljiva odnosno "objašnjiva". Vrijednosti se kreću od 0 do 1 gdje 0 znači da model ne objašnjava nikakvu varijaciju, a 1 znači da je sva varijacija objašnjena modelom.
+\[ R_{\text{kvadrat}} = 1 - \frac{\text{SSE}}{\text{SST}} \]
+
+
+```{r, echo=FALSE}
+R_squared_cgpt = 1 - SSE_cgpt/SST
+
+R_squared_bard = 1 - SSE_bard/SST
+
+cat("R^2 za ChatGPT:", R_squared_cgpt, "\n")
+cat("R^2 za Bard:", R_squared_bard, "\n")
+```
+Za ChatGPT, R^2 iznosi 0.35, što ukazuje da model objašnjava 35% varijacije ocjena.
+Za Bard, R^2 iznosi -0.15, što je manje od nule i ukazuje na to da ne samo da ne objašnjava nikakvu varijaciju, već i daje lošije predikcije ocjena nego da ih dodjeljujemo nasumično. 
+
+
+
