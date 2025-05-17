@@ -1,8 +1,9 @@
 # llm-open-ended-evaluation
 
-This repository contains the final thesis by **Lucija Runjić** titled:  
+This repository contains the **bachelor's thesis** by **Lucija Runjić** titled:  
 **"Korištenje velikih jezičnih modela u ocjenjivanju zadataka otvorenog tipa"**  
-(English: *Using Large Language Models in Evaluating Open-Ended Assignments*)
+(English: *Using Large Language Models in Evaluating Open-Ended Assignments*)  
+Submitted as part of the undergraduate program in Computing at the Faculty of Electrical Engineering and Computing, University of Zagreb.
 
 ---
 
@@ -22,6 +23,5 @@ U ovom radu istražuje se primjena velikih jezičnih modela u ocjenjivanju zadat
 
 - **Student:** Lucija Runjić  
 - **Mentor:** prof. dr. sc. Ljiljana Brkić  
-- **Study Program:** Computing (Faculty of Electrical Engineering and Computing, Zagreb)
 
 ---
